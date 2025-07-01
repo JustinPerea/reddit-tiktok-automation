@@ -15,6 +15,7 @@ from loguru import logger
 sys.path.append(str(Path(__file__).parent))
 
 from processors.content_processor import ContentProcessor
+from generators.hybrid_tts import HybridTTSEngine
 from utils.logger import setup_logging
 
 
@@ -220,6 +221,164 @@ def analyze(text):
         console.print("\n[yellow]💡 Suggestions for improvement:[/yellow]")
         for suggestion in suggestions:
             console.print(f"  • {suggestion}")
+
+
+@cli.command()
+def test_tts():
+    """Test the hybrid TTS system with available providers."""
+    console.print("[bold blue]🎙️ Testing Hybrid TTS System[/bold blue]\n")
+    
+    # Initialize TTS engine
+    tts_engine = HybridTTSEngine()
+    
+    # Check available providers
+    available_providers = tts_engine.tts_engine.get_available_providers()
+    
+    if not available_providers:
+        console.print("[red]❌ No TTS providers available![/red]")
+        console.print("\n[yellow]Install TTS providers:[/yellow]")
+        console.print("pip install gtts edge-tts pyttsx3")
+        console.print("pip install TTS  # For Coqui TTS")
+        return
+    
+    # Show available providers
+    console.print("[green]✅ Available TTS Providers:[/green]")
+    for provider in available_providers:
+        console.print(f"  • {provider.value}")
+    
+    # Get setup recommendations
+    recommendations = tts_engine.get_recommended_setup()
+    
+    console.print(f"\n[cyan]📋 Recommendations:[/cyan]")
+    console.print(f"Primary: {recommendations['primary_provider']}")
+    console.print(f"Fallback: {recommendations['fallback_provider']}")
+    console.print(f"Quality Rating: {recommendations['quality_rating']}")
+    
+    if recommendations['setup_commands']:
+        console.print(f"\n[yellow]💡 Install additional providers:[/yellow]")
+        for cmd in recommendations['setup_commands']:
+            console.print(f"  {cmd}")
+    
+    # Test synthesis
+    test_text = "Hello! This is a test of the Reddit to TikTok automation system. The quality of this voice will determine how engaging our videos will be."
+    
+    console.print(f"\n[blue]🎵 Testing synthesis with sample text...[/blue]")
+    
+    # Create fake content analysis for testing
+    content_analysis = {
+        "quality_score": 0.8,
+        "story_type": "aita",
+        "word_count": 250,
+        "emotional_score": 0.6,
+        "dominant_emotion": "neutral"
+    }
+    
+    with console.status("[bold green]Generating speech..."):
+        result = tts_engine.synthesize_with_fallback(test_text, content_analysis)
+    
+    if result.success:
+        console.print(f"[green]✅ TTS Success![/green]")
+        console.print(f"Provider: {result.provider_used.value}")
+        console.print(f"Quality Score: {result.quality_score:.2f}")
+        console.print(f"Duration: {result.duration:.1f} seconds")
+        console.print(f"Audio File: {result.audio_path}")
+        
+        if result.metadata:
+            console.print("\n[cyan]Metadata:[/cyan]")
+            for key, value in result.metadata.items():
+                console.print(f"  {key}: {value}")
+    else:
+        console.print(f"[red]❌ TTS Failed: {result.error_message}[/red]")
+
+
+@cli.command()
+@click.option('--text', '-t', default="This is a test of our TTS system.", help='Text to synthesize')
+@click.option('--provider', '-p', help='Specific provider to test (gtts, edge_tts, coqui, pyttsx3)')
+def synthesize(text, provider):
+    """Synthesize speech from text using the hybrid TTS system."""
+    console.print("[bold blue]🎙️ Speech Synthesis[/bold blue]\n")
+    
+    # Initialize processors
+    content_processor = ContentProcessor()
+    tts_engine = HybridTTSEngine()
+    
+    # Process content for analysis
+    with console.status("[bold green]Analyzing content..."):
+        processed_content = content_processor.process(text)
+    
+    if not processed_content:
+        console.print("[red]❌ Content processing failed![/red]")
+        return
+    
+    # Prepare content analysis
+    content_analysis = {
+        "quality_score": processed_content.validation.quality_score,
+        "story_type": processed_content.metadata.get("story_type", "general"),
+        "word_count": processed_content.validation.word_count,
+        "emotional_score": 0.6,  # Would come from emotional analyzer
+        "dominant_emotion": "neutral"
+    }
+    
+    # Show content analysis
+    console.print("[cyan]📊 Content Analysis:[/cyan]")
+    console.print(f"Quality Score: {content_analysis['quality_score']:.2f}")
+    console.print(f"Story Type: {content_analysis['story_type']}")
+    console.print(f"Word Count: {content_analysis['word_count']}")
+    
+    # Override provider if specified
+    if provider:
+        from generators.tts_engine import TTSProvider
+        provider_map = {
+            "gtts": TTSProvider.GTTS,
+            "edge_tts": TTSProvider.EDGE_TTS,
+            "coqui": TTSProvider.COQUI,
+            "pyttsx3": TTSProvider.PYTTSX3
+        }
+        
+        if provider in provider_map:
+            # Force specific provider
+            strategy = tts_engine.get_strategy_for_content(content_analysis)
+            strategy.provider_priorities = [provider_map[provider]]
+            console.print(f"[yellow]🎯 Using specified provider: {provider}[/yellow]")
+        else:
+            console.print(f"[red]❌ Unknown provider: {provider}[/red]")
+            return
+    
+    # Synthesize speech
+    with console.status("[bold green]Generating speech..."):
+        result = tts_engine.synthesize_with_fallback(
+            processed_content.tts_optimized_text, 
+            content_analysis
+        )
+    
+    if result.success:
+        console.print(f"\n[green]✅ Speech synthesis successful![/green]")
+        
+        # Results table
+        table = Table(title="TTS Results")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="magenta")
+        
+        table.add_row("Provider Used", result.provider_used.value)
+        table.add_row("Quality Score", f"{result.quality_score:.2f}")
+        table.add_row("Duration", f"{result.duration:.1f} seconds")
+        table.add_row("Audio File", str(result.audio_path))
+        
+        if result.metadata:
+            for key, value in result.metadata.items():
+                table.add_row(key.replace("_", " ").title(), str(value))
+        
+        console.print(table)
+        
+        # Show processed text
+        console.print("\n" + Panel(
+            processed_content.tts_optimized_text,
+            title="[bold green]Synthesized Text[/bold green]",
+            border_style="green"
+        ))
+        
+    else:
+        console.print(f"[red]❌ Speech synthesis failed: {result.error_message}[/red]")
 
 
 if __name__ == "__main__":
