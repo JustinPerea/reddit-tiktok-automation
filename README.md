@@ -31,6 +31,13 @@ cp .env.example .env
 
 # Run the application
 python src/main.py
+
+# Test the content processing engine
+PYTHONPATH=. python src/cli.py demo
+PYTHONPATH=. python src/cli.py analyze "Your Reddit story here..."
+
+# Run tests
+PYTHONPATH=. python -m pytest tests/unit/ -v
 ```
 
 ## 📁 Project Structure
@@ -58,10 +65,12 @@ reddit-tiktok-automation/
 
 ## 📋 Development Phases
 
-### Phase 1: MVP Manual System (Weeks 1-3)
+### Phase 1: MVP Manual System (Weeks 1-3) - 🚧 IN PROGRESS
 - [x] Project setup and core infrastructure
-- [ ] Content processing engine
-- [ ] TTS integration
+- [x] Content processing engine with quality scoring
+- [x] Reddit formatting and TTS optimization
+- [x] CLI interface and comprehensive testing
+- [ ] TTS integration (OpenAI/ElevenLabs)
 - [ ] Basic video generation pipeline
 
 ### Phase 2: Enhanced Interface (Weeks 4-7)
@@ -100,12 +109,42 @@ VIDEO_OUTPUT_FORMAT=mp4
 QUALITY_THRESHOLD=0.7
 ```
 
+## 🧠 Content Processing Engine
+
+Our AI-powered content processing engine analyzes Reddit stories for viral potential:
+
+### Quality Scoring Algorithm (0.0-1.0)
+- **Length Optimization** (30%): 200-400 words optimal for 60-90 second videos
+- **Emotional Engagement** (25%): Detects anger, surprise, joy for maximum engagement
+- **Story Structure** (20%): Validates narrative arc (setup, conflict, resolution)
+- **Readability** (15%): Optimizes for text-to-speech and mobile consumption
+- **Engagement Hooks** (10%): Identifies viral patterns and audience interaction triggers
+
+### Reddit-Specific Optimization
+- **Abbreviation Expansion**: AITA → "Am I the jerk", TL;DR → "Too long, didn't read"
+- **Format Cleanup**: Removes edits, updates, meta content, and Reddit markup
+- **TTS Enhancement**: Expands contractions, adds natural pauses, fixes pronunciations
+- **Story Classification**: Auto-detects AITA, relationship, workplace, family, TIFU content
+
+### CLI Testing Interface
+```bash
+# Analyze content quality
+PYTHONPATH=. python src/cli.py analyze "Your story here..."
+
+# Run full processing demo
+PYTHONPATH=. python src/cli.py demo
+
+# Process custom content
+PYTHONPATH=. python src/cli.py process --text "Your Reddit story" --url "source_url"
+```
+
 ## 📊 Success Metrics
 
 - Content processing time: <2 minutes per video
 - Upload success rate: >95% across all platforms
 - Video approval rate: >90% of generated content
 - System uptime: >99% availability
+- **Quality prediction accuracy: 80%+ viral potential detection**
 
 ## ⚖️ Legal Compliance
 
