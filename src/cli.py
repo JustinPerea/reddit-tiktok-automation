@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent))
 
 from processors.content_processor import ContentProcessor
 from generators.hybrid_tts import HybridTTSEngine
+from generators.video_generator import VideoGenerator, VideoConfig, VideoFormat, BackgroundType
 from utils.logger import setup_logging
 
 
@@ -379,6 +380,155 @@ def synthesize(text, provider):
         
     else:
         console.print(f"[red]❌ Speech synthesis failed: {result.error_message}[/red]")
+
+
+@cli.command()
+@click.option('--text', '-t', help='Text content for video')
+@click.option('--audio', '-a', type=click.Path(exists=True), help='Path to audio file')
+@click.option('--background', '-b', 
+              type=click.Choice(['geometric_patterns', 'minecraft_parkour', 'subway_surfers', 
+                               'satisfying_slime', 'cooking_asmr', 'nature_scenes']),
+              default='geometric_patterns', help='Background style')
+@click.option('--format', '-f',
+              type=click.Choice(['tiktok', 'instagram_reel', 'youtube_short', 'square']),
+              default='tiktok', help='Video format')
+@click.option('--output', '-o', type=click.Path(), help='Output video path')
+def create_video(text, audio, background, format, output):
+    """Generate a complete video from text and audio."""
+    console.print("[bold blue]🎬 Video Generation[/bold blue]\n")
+    
+    if not text and not audio:
+        console.print("[red]❌ Please provide either --text or --audio file![/red]")
+        return
+    
+    # Initialize processors
+    content_processor = ContentProcessor()
+    tts_engine = HybridTTSEngine()
+    video_generator = VideoGenerator()
+    
+    try:
+        audio_path = None
+        
+        if audio:
+            # Use provided audio file
+            audio_path = Path(audio)
+            console.print(f"[blue]Using audio file: {audio_path}[/blue]")
+        elif text:
+            # Generate audio from text
+            console.print(f"[blue]Processing text and generating audio...[/blue]")
+            
+            with console.status("[bold green]Processing content..."):
+                processed_content = content_processor.process(text)
+            
+            if not processed_content:
+                console.print("[red]❌ Content processing failed![/red]")
+                return
+            
+            # Prepare content analysis
+            content_analysis = {
+                "quality_score": processed_content.validation.quality_score,
+                "story_type": processed_content.metadata.get("story_type", "general"),
+                "word_count": processed_content.validation.word_count,
+                "emotional_score": 0.6,
+                "dominant_emotion": "neutral"
+            }
+            
+            with console.status("[bold green]Generating speech..."):
+                tts_result = tts_engine.synthesize_with_fallback(
+                    processed_content.tts_optimized_text,
+                    content_analysis
+                )
+            
+            if not tts_result.success:
+                console.print(f"[red]❌ TTS failed: {tts_result.error_message}[/red]")
+                return
+            
+            audio_path = tts_result.audio_path
+            text = processed_content.tts_optimized_text
+            console.print(f"[green]✅ Audio generated: {audio_path}[/green]")
+        
+        # Configure video generation
+        background_map = {
+            'geometric_patterns': BackgroundType.GEOMETRIC_PATTERNS,
+            'minecraft_parkour': BackgroundType.MINECRAFT_PARKOUR,
+            'subway_surfers': BackgroundType.SUBWAY_SURFERS,
+            'satisfying_slime': BackgroundType.SATISFYING_SLIME,
+            'cooking_asmr': BackgroundType.COOKING_ASMR,
+            'nature_scenes': BackgroundType.NATURE_SCENES
+        }
+        
+        format_map = {
+            'tiktok': VideoFormat.TIKTOK,
+            'instagram_reel': VideoFormat.INSTAGRAM_REEL,
+            'youtube_short': VideoFormat.YOUTUBE_SHORT,
+            'square': VideoFormat.SQUARE
+        }
+        
+        config = VideoConfig(
+            format=format_map[format],
+            background_type=background_map[background]
+        )
+        
+        # Generate video
+        console.print(f"[blue]Generating {format} video with {background} background...[/blue]")
+        
+        output_path = Path(output) if output else None
+        
+        with console.status("[bold green]Creating video... (this may take a few minutes)"):
+            video_result = video_generator.generate_video(
+                audio_path=audio_path,
+                text=text if text else "Generated Video",
+                config=config,
+                output_path=output_path
+            )
+        
+        if video_result.success:
+            console.print("[green]✅ Video generation successful![/green]")
+            
+            # Results table
+            table = Table(title="Video Generation Results")
+            table.add_column("Property", style="cyan")
+            table.add_column("Value", style="magenta")
+            
+            table.add_row("Video File", str(video_result.video_path))
+            table.add_row("Duration", f"{video_result.duration:.1f} seconds")
+            table.add_row("Format", video_result.format.value)
+            table.add_row("File Size", f"{video_result.file_size / (1024*1024):.1f} MB")
+            
+            if video_result.metadata:
+                table.add_row("Resolution", f"{video_result.metadata.get('width', 0)}x{video_result.metadata.get('height', 0)}")
+                table.add_row("FPS", str(video_result.metadata.get('fps', 0)))
+                table.add_row("Video Codec", video_result.metadata.get('video_codec', 'N/A'))
+                table.add_row("Audio Codec", video_result.metadata.get('audio_codec', 'N/A'))
+            
+            console.print(table)
+        else:
+            console.print(f"[red]❌ Video generation failed: {video_result.error_message}[/red]")
+            
+    except Exception as e:
+        console.print(f"[red]❌ Error: {e}[/red]")
+
+
+@cli.command()
+@click.option('--host', default='127.0.0.1', help='Host to bind to')
+@click.option('--port', default=8000, help='Port to bind to')
+@click.option('--no-reload', is_flag=True, help='Disable auto-reload')
+def web(host, port, no_reload):
+    """Start the web interface for Reddit-to-TikTok automation."""
+    console.print(f"[bold blue]🌐 Starting Web Interface[/bold blue]")
+    console.print(f"[green]Access your application at:[/green] [bold]http://{host}:{port}[/bold]")
+    console.print("[yellow]Press Ctrl+C to stop the server[/yellow]\n")
+    
+    try:
+        from web_app import run_web_app
+        run_web_app(host=host, port=int(port), reload=not no_reload)
+    except ImportError:
+        console.print("[red]❌ Web app dependencies missing![/red]")
+        console.print("Install with: pip install uvicorn fastapi")
+    except KeyboardInterrupt:
+        console.print("\n[yellow]👋 Web server stopped[/yellow]")
+    except Exception as e:
+        console.print(f"[red]❌ Error starting web server: {e}[/red]")
 
 
 if __name__ == "__main__":
