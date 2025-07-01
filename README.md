@@ -11,9 +11,10 @@ This system enables content creators to efficiently transform Reddit stories int
 ### 🎬 Complete Video Generation Pipeline
 - **Web Interface**: User-friendly browser-based interface for content processing and video creation
 - **Hybrid TTS System**: 4 free TTS providers with intelligent selection (saves $3K-7K/year)
-- **Video Generation**: FFmpeg-powered video assembly with text overlays and background videos
-- **Multi-Format Support**: TikTok (9:16), Instagram Reels, YouTube Shorts, Square formats
-- **Background Styles**: 6 different background types (geometric, gaming, ASMR, nature, etc.)
+- **Video Generation**: FFmpeg-powered video assembly with text overlays directly applied to backgrounds
+- **Multi-Format Support**: TikTok (9:16), Instagram Reels, YouTube Shorts, Square formats  
+- **Background Library**: 14 procedurally generated background styles with smart content matching
+- **Text Overlay Engine**: Dynamic text positioning with outline, shadow, and background effects
 
 ### 🧠 Intelligent Content Processing  
 - **AI Quality Scoring**: 5-component viral potential algorithm (92% accuracy)
@@ -114,6 +115,8 @@ reddit-tiktok-automation/
 - [x] **Complete video generation pipeline with web interface**
 - [x] **FFmpeg integration for professional video assembly**
 - [x] **Multi-background and multi-format video generation**
+- [x] **Enhanced text overlay engine with proper character escaping**
+- [x] **Streamlined video assembly process for better performance**
 
 ### Phase 2: Enhanced Interface (Weeks 4-7)
 - [ ] Multi-platform optimization
@@ -214,13 +217,30 @@ Our complete video generation system creates TikTok-ready videos with profession
 - **YouTube Shorts**: 9:16 aspect ratio, 1080x1920, YouTube-optimized  
 - **Square**: 1:1 aspect ratio, 1080x1080, multi-platform compatible
 
-### Background Styles
-- **Geometric Patterns**: Clean, modern animated patterns - *Best for educational/tech content*
+### Background Styles (14 Available)
+**Gaming Backgrounds:**
 - **Minecraft Parkour**: Gaming footage - *Best for TIFU, gaming stories*
 - **Subway Surfers**: Popular endless runner gameplay - *Best for AITA, relationship stories*
-- **Satisfying Slime**: ASMR-style content - *Best for emotional, personal stories*
+- **Temple Run**: Adventure running - *Best for escape/travel stories*
+- **Fruit Ninja**: Action gameplay - *Best for quick/energetic content*
+
+**Satisfying Backgrounds:**
+- **Slime Mixing**: ASMR-style colorful slime content - *Best for emotional, personal stories*
+- **Kinetic Sand**: Therapeutic sand manipulation - *Best for meditation/calm content*
+- **Soap Cutting**: Precision ASMR cutting - *Best for satisfying content*
+
+**Nature Backgrounds:**
+- **Rain Window**: Peaceful rain on glass - *Best for sad/reflective stories*
+- **Ocean Waves**: Calming ocean scenes - *Best for meditation/escape content*
+- **Fireplace**: Cozy fire scenes - *Best for winter/comfort stories*
+
+**Abstract Backgrounds:**
+- **Geometric Patterns**: Clean, modern animated patterns - *Best for educational/tech content*
+- **Color Gradients**: Flowing color transitions - *Best for artistic/creative content*
+- **Particle Effects**: Dynamic particle systems - *Best for tech/science content*
+
+**Lifestyle Backgrounds:**
 - **Cooking ASMR**: Food preparation footage - *Best for family, lifestyle content*
-- **Nature Scenes**: Calming landscapes - *Best for reflection, philosophical content*
 
 ### Technical Specifications
 - **Resolution**: 1080p (1920x1080 or 1080x1920)
@@ -232,10 +252,11 @@ Our complete video generation system creates TikTok-ready videos with profession
 
 ### Video Generation Workflow
 1. **Content Analysis**: AI determines optimal background based on story type and emotion
-2. **Background Creation**: Generates or selects appropriate background video
-3. **Text Overlay**: Creates professional text overlay with timing synchronization
-4. **Audio Integration**: Combines TTS audio with video components
-5. **Final Assembly**: FFmpeg-powered video assembly with optimizations
+2. **Background Creation**: Generates or selects appropriate background video (procedural generation)
+3. **Text Processing**: Advanced text escaping for special characters ($, quotes, colons, etc.)
+4. **Direct Text Application**: Text overlays applied directly to background (no intermediate files)
+5. **Audio Integration**: Combines TTS audio with video components
+6. **Final Assembly**: Streamlined FFmpeg-powered video assembly with optimizations
 
 ### CLI Video Generation
 ```bash
