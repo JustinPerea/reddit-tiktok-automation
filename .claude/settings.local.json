@@ -4,7 +4,13 @@
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(python:*)",
+      "Bash(PYTHONPATH=/Users/justinperea/Documents/Projects/reddit_video_bot_project python /Users/justinperea/Documents/Projects/reddit_video_bot_project/src/cli.py analyze \"AITA for telling my roommate to clean up? She never does dishes and leaves her stuff everywhere. I finally snapped and told her she was being inconsiderate. Now she''s mad at me and says I''m being dramatic. But I think she needed to hear it. What do you think?\")",
+      "Bash(PYTHONPATH=/Users/justinperea/Documents/Projects/reddit_video_bot_project python -m pytest tests/unit/test_content_processor.py -v)"
     ],
     "deny": []
   }
