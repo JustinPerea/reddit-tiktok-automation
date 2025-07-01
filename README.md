@@ -254,9 +254,30 @@ Our complete video generation system creates TikTok-ready videos with profession
 1. **Content Analysis**: AI determines optimal background based on story type and emotion
 2. **Background Creation**: Generates or selects appropriate background video (procedural generation)
 3. **Text Processing**: Advanced text escaping for special characters ($, quotes, colons, etc.)
-4. **Direct Text Application**: Text overlays applied directly to background (no intermediate files)
-5. **Audio Integration**: Combines TTS audio with video components
-6. **Final Assembly**: Streamlined FFmpeg-powered video assembly with optimizations
+4. **TTS Generation**: Hybrid system with intelligent provider selection and fallback
+5. **Word-Level Timing**: Audio analysis for precise word-by-word synchronization *(Enhanced with WhisperX in Phase 2)*
+6. **Subtitle Generation**: Creates SRT files with individual word timings for viral TikTok effects
+7. **Final Assembly**: FFmpeg-powered video assembly with synchronized text overlays
+
+## 🔄 Current Development: Phase 2 Pivot
+
+**Status**: Implementing professional-grade audio-video synchronization based on research findings.
+
+### Identified Issues
+- **Text Mismatch**: TTS audio contains processed text ("28 female") while subtitles show original text ("(28F)")
+- **Timing Drift**: Current ~0.4s per word average causes cumulative synchronization errors
+- **Imprecise Segmentation**: 267 words mapped to 55-105 audio segments vs actual speech patterns
+
+### Solution: WhisperX Forced Alignment
+Based on comprehensive research ([Session 1](docs/guide/research_session_1.md), [Session 2](docs/guide/research_session_2.md)), implementing:
+
+- **WhisperX Integration**: 95% accuracy with <100ms precision for word-level timestamps
+- **Bidirectional Text Normalization**: Maintains original text for subtitles while using processed text for TTS
+- **Performance Optimization**: VidGear integration for 3-4x video processing speed improvement
+
+### Research Documentation
+- 📚 [Research Session 1](docs/guide/research_session_1.md): Forced alignment tools analysis
+- 📚 [Research Session 2](docs/guide/research_session_2.md): Free implementation strategies
 
 ### CLI Video Generation
 ```bash

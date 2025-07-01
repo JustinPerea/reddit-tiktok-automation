@@ -65,30 +65,80 @@ PYTHONPATH=. python -m pytest tests/unit/ -v
 - **Output**: MP4 videos ready for TikTok, Instagram, YouTube upload
 - **Performance**: 5-10 minutes per video (vs 2-3 hours manual creation)
 
-## 🚀 Next Phase: Production Optimization (Phase 2)
+## 🔄 CRITICAL PIVOT: Audio-Video Synchronization Overhaul (Phase 2)
 
-### Immediate Priorities (Next 2-4 Weeks)
+**Research Findings**: Our current audio analysis approach has fundamental limitations causing sync issues. Professional-grade word-level synchronization requires specialized forced alignment tools.
 
-#### 1. Production Hardening
+### 🎯 IMMEDIATE PRIORITY: WhisperX Integration
+
+**Problem Identified**: 
+- Current system: ~0.4s average per word with cumulative drift
+- Text mismatch: TTS says "28 female" but subtitles show "(28F)"
+- Imprecise timing: 267 words forced into 55-105 segments ≠ actual speech patterns
+
+**Solution**: Research-backed implementation using forced alignment
+
+#### Phase 2A: Core Synchronization (Next 1-2 Weeks)
+- [ ] **WhisperX Integration**: Replace librosa with forced alignment (95% accuracy, <100ms precision)
+- [ ] **Bidirectional Text Normalization**: Fix TTS vs subtitle text mismatch
+- [ ] **Precise Word Timing**: Use actual speech patterns vs artificial segmentation
+- [ ] **VidGear Performance**: Replace FFmpeg subprocess (3-4x speed improvement)
+
+#### Phase 2B: Professional Quality (Following 2 Weeks)
+- [ ] **Montreal Forced Aligner**: Backup option for highest accuracy (11ms median error)
+- [ ] **Context-Aware Normalization**: Smart handling of "(28F)" → "28 female" expansions
+- [ ] **ASS Subtitle Format**: Rich styling for TikTok-style word reveals
+- [ ] **Confidence Scoring**: Quality assurance for alignment accuracy
+
+### 📚 Research Documentation
+- [Research Session 1](docs/guide/research_session_1.md): Comprehensive forced alignment analysis
+- [Research Session 2](docs/guide/research_session_2.md): Free tool evaluation and cost analysis
+
+### 🔧 Technical Implementation Plan
+
+#### Step 1: WhisperX Installation
+```bash
+pip install whisperx torch torchaudio
+```
+
+#### Step 2: Replace Audio Analysis
+Replace `src/generators/video_generator.py::_analyze_audio_for_word_timings()` with:
+- WhisperX transcription + forced alignment
+- Word-level timestamps with <100ms precision
+- GPU acceleration for 70x real-time processing
+
+#### Step 3: Text Normalization System
+Update `src/processors/reddit_formatter.py` to create:
+- Bidirectional mapping between original and TTS text
+- Context-aware abbreviation expansion
+- Character-level alignment preservation
+
+#### Step 4: Performance Optimization
+- Integrate VidGear for video processing
+- Pre-calculate word display timelines
+- Implement frame-accurate word reveals
+
+### 🎯 Expected Results
+- ✅ **Perfect text matching**: Subtitles show exact words spoken
+- ✅ **<100ms timing precision**: WhisperX forced alignment accuracy  
+- ✅ **No more drift**: Real word boundaries vs artificial segmentation
+- ✅ **TikTok-quality sync**: Professional word-by-word reveals
+- ✅ **3-4x performance**: VidGear vs current FFmpeg approach
+
+## 🚀 Previous Phase 2 Goals (Deferred)
+
+#### Production Hardening (Post-Sync Fix)
 - [ ] **Error Recovery**: Enhanced error handling and automatic retry logic
-- [ ] **Performance Optimization**: Video generation speed improvements  
 - [ ] **Memory Management**: Optimize for long-running processes
 - [ ] **Background Video Library**: Implement user-uploaded video database system
 - [ ] **Voice Fine-tuning**: Custom voice models for different story types
 
-#### 2. Enhanced Features
+#### Enhanced Features (Post-Sync Fix)
 - [ ] **Batch Processing**: Generate multiple videos from a queue
 - [ ] **Template System**: Pre-configured styles for different content types
 - [ ] **Quality Presets**: Fast/Standard/Premium quality options
 - [ ] **Auto-tagging**: Generate hashtags and descriptions
 - [ ] **Export Profiles**: Platform-specific optimization presets
-
-#### 3. Advanced Video Features
-- [ ] **Dynamic Text Sizing**: Auto-adjust text size based on content length
-- [ ] **Scene Transitions**: Smooth transitions between text segments
-- [ ] **Progress Indicators**: Visual progress bars during long videos
-- [ ] **Thumbnail Generation**: Auto-generate eye-catching thumbnails
-- [ ] **Multi-voice Support**: Different voices for different characters/emotions
 
 ### Quick Start Commands
 

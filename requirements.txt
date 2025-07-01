@@ -106,6 +106,12 @@ wand==0.6.13  # ImageMagick binding
 # FFmpeg Python wrapper
 ffmpeg-python==0.2.0
 
+# Phase 2: Professional Audio-Video Synchronization
+whisperx==3.1.1              # Forced alignment for precise word timing
+torch>=2.0.0                 # PyTorch for WhisperX
+torchaudio>=2.0.0            # Audio processing for WhisperX
+vidgear[core]==0.3.2         # High-performance video processing (3-4x faster than MoviePy)
+
 # GUI Framework (for desktop app)
 tkinter  # Built-in with Python
 customtkinter==5.2.0
