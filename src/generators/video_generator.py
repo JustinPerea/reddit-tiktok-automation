@@ -26,6 +26,7 @@ except ImportError:
 from utils.logger import get_logger
 from config.settings import get_settings
 from generators.background_library import BackgroundLibrary, BackgroundStyle
+from generators.background_video_library import create_background_video_library, VideoSubcategory
 # Temporarily disabled due to NumPy 2.x compatibility issues
 # from generators.whisperx_aligner import create_aligner, WordTiming
 # from generators.whisper_analyzer import create_whisper_analyzer  
@@ -95,8 +96,9 @@ class VideoGenerator:
         self.temp_dir = Path(tempfile.gettempdir()) / "reddit_tiktok_videos"
         self.temp_dir.mkdir(exist_ok=True)
         
-        # Initialize background library
-        self.background_library = BackgroundLibrary()
+        # Initialize background libraries
+        self.background_library = BackgroundLibrary()  # Legacy procedural backgrounds
+        self.video_library = create_background_video_library()  # New real video library
         
         # Initialize WhisperS2T analyzer (lazy loading)
         self.whispers2t_analyzer = None
@@ -234,11 +236,36 @@ class VideoGenerator:
             return 0.0
     
     def _create_background_video(self, duration: float, config: VideoConfig) -> Optional[Path]:
-        """Create or select background video using the enhanced background library."""
+        """Create or select background video using real videos first, then procedural generation."""
         try:
             specs = self.format_specs[config.format]
             
-            # Convert legacy BackgroundType to BackgroundStyle
+            # First: Try to use real videos from the video library
+            video_subcategory_map = {
+                BackgroundType.MINECRAFT_PARKOUR: VideoSubcategory.MINECRAFT_PARKOUR,
+                BackgroundType.SUBWAY_SURFERS: VideoSubcategory.SUBWAY_SURFERS,
+                BackgroundType.SATISFYING_SLIME: VideoSubcategory.SLIME_MIXING,
+                BackgroundType.COOKING_ASMR: VideoSubcategory.COOKING_ASMR,
+                BackgroundType.NATURE_SCENES: VideoSubcategory.OCEAN_WAVES,
+                BackgroundType.GEOMETRIC_PATTERNS: VideoSubcategory.GEOMETRIC_PATTERNS
+            }
+            
+            video_subcategory = video_subcategory_map.get(config.background_type, VideoSubcategory.GEOMETRIC_PATTERNS)
+            
+            # Try to get a real video first
+            selected_video = self.video_library.get_random_video(subcategory=video_subcategory)
+            
+            if selected_video and selected_video.is_available:
+                # Use real video and loop it if needed
+                background_path = self._prepare_real_background_video(selected_video.path, duration, config, specs)
+                if background_path:
+                    logger.info(f"Using real background video: {selected_video.name} from {video_subcategory.value}")
+                    return background_path
+            
+            # Second: Fall back to procedural generation
+            logger.info(f"No real video available for {video_subcategory.value}, using procedural generation")
+            
+            # Convert to BackgroundStyle for procedural generation
             background_style_map = {
                 BackgroundType.MINECRAFT_PARKOUR: BackgroundStyle.MINECRAFT_PARKOUR,
                 BackgroundType.SUBWAY_SURFERS: BackgroundStyle.SUBWAY_SURFERS,
@@ -248,10 +275,9 @@ class VideoGenerator:
                 BackgroundType.GEOMETRIC_PATTERNS: BackgroundStyle.GEOMETRIC_PATTERNS
             }
             
-            # Get the appropriate background style
             background_style = background_style_map.get(config.background_type, BackgroundStyle.GEOMETRIC_PATTERNS)
             
-            # Use the background library to generate the video
+            # Use the procedural background library
             background_path = self.background_library.generate_background(
                 style=background_style,
                 duration=duration,
@@ -259,15 +285,78 @@ class VideoGenerator:
             )
             
             if background_path and background_path.exists():
-                logger.info(f"Background video created using library: {background_path}")
+                logger.info(f"Background video created using procedural library: {background_path}")
                 return background_path
             else:
-                logger.warning(f"Background library failed, falling back to simple generation")
+                logger.warning(f"Procedural background library failed, falling back to simple generation")
                 return self._create_simple_background(duration, config, specs)
                 
         except Exception as e:
             logger.error(f"Error creating background video: {e}")
             return self._create_simple_background(duration, config, specs)
+    
+    def _prepare_real_background_video(self, video_path: Path, duration: float, config: VideoConfig, specs: Dict[str, Any]) -> Optional[Path]:
+        """Prepare real background video by looping and resizing as needed."""
+        try:
+            output_path = self.temp_dir / f"real_background_{random.randint(1000, 9999)}.mp4"
+            
+            # Get video info to determine if we need to loop
+            probe_cmd = [
+                "ffprobe", "-v", "quiet", "-print_format", "json", "-show_format",
+                str(video_path)
+            ]
+            
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+            
+            if probe_result.returncode != 0:
+                logger.warning(f"Could not probe video {video_path}: {probe_result.stderr}")
+                return None
+            
+            import json
+            video_info = json.loads(probe_result.stdout)
+            video_duration = float(video_info.get('format', {}).get('duration', 0))
+            
+            if video_duration <= 0:
+                logger.warning(f"Invalid video duration for {video_path}")
+                return None
+            
+            # Determine if we need to loop the video
+            if duration > video_duration:
+                # Need to loop the video
+                loops = math.ceil(duration / video_duration)
+                # Scale to fill and center crop to maintain aspect ratio
+                filter_complex = f"[0:v]loop={loops}:size=32767:start=0,scale={specs['width']}:{specs['height']}:force_original_aspect_ratio=increase,crop={specs['width']}:{specs['height']},fps={specs['fps']},setpts=PTS-STARTPTS[v]"
+            else:
+                # Video is long enough, just resize and trim
+                # Scale to fill and center crop to maintain aspect ratio
+                filter_complex = f"[0:v]scale={specs['width']}:{specs['height']}:force_original_aspect_ratio=increase,crop={specs['width']}:{specs['height']},fps={specs['fps']},setpts=PTS-STARTPTS[v]"
+            
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(video_path),
+                "-filter_complex", filter_complex,
+                "-map", "[v]",
+                "-t", str(duration),
+                "-c:v", "libx264",
+                "-preset", "medium",
+                "-crf", "23",
+                "-r", str(specs['fps']),
+                "-movflags", "+faststart",
+                str(output_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            
+            if result.returncode == 0 and output_path.exists():
+                logger.info(f"Real background video prepared: {output_path} (duration: {duration:.1f}s)")
+                return output_path
+            else:
+                logger.error(f"Failed to prepare real background video: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error preparing real background video: {e}")
+            return None
     
     def _create_simple_background(self, duration: float, config: VideoConfig, specs: Dict[str, Any]) -> Optional[Path]:
         """Create a simple fallback background video."""

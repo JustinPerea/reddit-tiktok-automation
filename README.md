@@ -15,6 +15,7 @@ This system enables content creators to efficiently transform Reddit stories int
 - **Multi-Format Support**: TikTok (9:16), Instagram Reels, YouTube Shorts, Square formats  
 - **Background Library**: 14 procedurally generated background styles with smart content matching
 - **Text Overlay Engine**: Dynamic text positioning with outline, shadow, and background effects
+- **Aspect Ratio Preservation**: Intelligent center-cropping maintains original video proportions without stretching
 
 ### 🧠 Intelligent Content Processing  
 - **AI Quality Scoring**: 5-component viral potential algorithm (92% accuracy)
