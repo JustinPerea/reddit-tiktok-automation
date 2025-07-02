@@ -387,7 +387,10 @@ def synthesize(text, provider):
 @click.option('--audio', '-a', type=click.Path(exists=True), help='Path to audio file')
 @click.option('--background', '-b', 
               type=click.Choice(['geometric_patterns', 'minecraft_parkour', 'subway_surfers', 
-                               'satisfying_slime', 'cooking_asmr', 'nature_scenes']),
+                               'satisfying_slime', 'cooking_asmr', 'nature_scenes',
+                               'slime_mixing', 'kinetic_sand', 'soap_cutting',
+                               'rain_window', 'ocean_waves', 'fireplace',
+                               'color_gradients', 'particle_effects', 'coffee_brewing']),
               default='geometric_patterns', help='Background style')
 @click.option('--format', '-f',
               type=click.Choice(['tiktok', 'instagram_reel', 'youtube_short', 'square']),
@@ -447,14 +450,24 @@ def create_video(text, audio, background, format, output):
             text = processed_content.tts_optimized_text
             console.print(f"[green]✅ Audio generated: {audio_path}[/green]")
         
-        # Configure video generation
+        # Configure video generation - expanded background options
         background_map = {
             'geometric_patterns': BackgroundType.GEOMETRIC_PATTERNS,
             'minecraft_parkour': BackgroundType.MINECRAFT_PARKOUR,
             'subway_surfers': BackgroundType.SUBWAY_SURFERS,
             'satisfying_slime': BackgroundType.SATISFYING_SLIME,
             'cooking_asmr': BackgroundType.COOKING_ASMR,
-            'nature_scenes': BackgroundType.NATURE_SCENES
+            'nature_scenes': BackgroundType.NATURE_SCENES,
+            # New enhanced backgrounds (map to closest legacy type for compatibility)
+            'slime_mixing': BackgroundType.SATISFYING_SLIME,
+            'kinetic_sand': BackgroundType.SATISFYING_SLIME,
+            'soap_cutting': BackgroundType.SATISFYING_SLIME,
+            'rain_window': BackgroundType.NATURE_SCENES,
+            'ocean_waves': BackgroundType.NATURE_SCENES,
+            'fireplace': BackgroundType.NATURE_SCENES,
+            'color_gradients': BackgroundType.GEOMETRIC_PATTERNS,
+            'particle_effects': BackgroundType.GEOMETRIC_PATTERNS,
+            'coffee_brewing': BackgroundType.COOKING_ASMR
         }
         
         format_map = {

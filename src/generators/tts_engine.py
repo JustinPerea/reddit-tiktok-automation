@@ -117,10 +117,10 @@ class TTSEngine:
         from .providers.pyttsx3_provider import PyTTSx3Provider
         from .providers.edge_tts_provider import EdgeTTSProvider
         
-        # Initialize providers
+        # Initialize providers (Coqui disabled - incompatible with Python 3.12+)
         potential_providers = [
             (TTSProvider.GTTS, GTTSProvider),
-            (TTSProvider.COQUI, CoquiProvider),
+            # (TTSProvider.COQUI, CoquiProvider),  # Disabled - requires Python 3.9-3.11
             (TTSProvider.PYTTSX3, PyTTSx3Provider),
             (TTSProvider.EDGE_TTS, EdgeTTSProvider),
         ]

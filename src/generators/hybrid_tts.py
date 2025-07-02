@@ -87,13 +87,13 @@ class HybridTTSEngine:
         word_count = content_analysis.get("word_count", 200)
         emotional_score = content_analysis.get("emotional_score", 0.3)
         
-        # High quality content gets premium treatment
+        # High quality content gets premium treatment (gTTS first for async compatibility)
         if quality_score >= 0.8:
             return TTSStrategy(
                 provider_priorities=[
+                    TTSProvider.GTTS,
                     TTSProvider.EDGE_TTS,
                     TTSProvider.COQUI,
-                    TTSProvider.GTTS,
                     TTSProvider.PYTTSX3
                 ],
                 quality_threshold=0.8,
@@ -101,13 +101,13 @@ class HybridTTSEngine:
                 cost_weight=0.0  # Don't worry about cost for high-quality content
             )
         
-        # Emotional content benefits from better voice control
+        # Emotional content benefits from better voice control (gTTS first for async compatibility)
         elif emotional_score >= 0.6:
             return TTSStrategy(
                 provider_priorities=[
+                    TTSProvider.GTTS,
                     TTSProvider.EDGE_TTS,
                     TTSProvider.COQUI,
-                    TTSProvider.GTTS,
                     TTSProvider.PYTTSX3
                 ],
                 quality_threshold=0.7,

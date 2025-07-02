@@ -44,8 +44,15 @@ class EdgeTTSProvider(BaseTTSProvider):
             return self._voices_cache
         
         try:
-            # Get voices asynchronously
-            voices = asyncio.run(self._get_voices_async())
+            # Get voices asynchronously - handle existing event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an event loop, skip voice fetching and use defaults
+                self.logger.debug("Event loop detected, using default voices")
+                return self._get_default_voices()
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run()
+                voices = asyncio.run(self._get_voices_async())
             
             # Filter to most common/useful voices for TikTok
             voice_dict = {}
@@ -134,8 +141,22 @@ class EdgeTTSProvider(BaseTTSProvider):
             )
         
         try:
-            # Run async synthesis
-            result = asyncio.run(self._synthesize_async(request))
+            # Run async synthesis - handle existing event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an event loop, we can't use asyncio.run()
+                self.logger.debug("Event loop detected, Edge TTS unavailable in this context")
+                return TTSResult(
+                    success=False,
+                    audio_path=None,
+                    provider_used=TTSProvider.EDGE_TTS,
+                    duration=0.0,
+                    quality_score=0.0,
+                    error_message="Edge TTS not available in async context"
+                )
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run()
+                result = asyncio.run(self._synthesize_async(request))
             return result
             
         except Exception as e:

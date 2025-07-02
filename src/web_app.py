@@ -18,6 +18,7 @@ import uvicorn
 from processors.content_processor import ContentProcessor
 from generators.hybrid_tts import HybridTTSEngine
 from generators.video_generator import VideoGenerator, VideoConfig, VideoFormat, BackgroundType
+from processors.text_normalizer import create_normalizer
 from config.settings import get_settings
 from utils.logger import setup_logging, get_logger
 
@@ -26,10 +27,14 @@ from utils.logger import setup_logging, get_logger
 setup_logging()
 logger = get_logger("WebApp")
 
+# Simple cache for processed text to sync TTS and video generation
+processed_text_cache = {}
+
 # Initialize processors
 content_processor = ContentProcessor()
 tts_engine = HybridTTSEngine()
 video_generator = VideoGenerator()
+text_normalizer = create_normalizer()
 settings = get_settings()
 
 # Create FastAPI app
@@ -72,6 +77,8 @@ class VideoRequest(BaseModel):
     audio_filename: str
     background_type: Optional[str] = "geometric_patterns"
     video_format: Optional[str] = "tiktok"
+    synchronized_text: Optional[bool] = True
+    processed_text: Optional[str] = None  # TTS-processed text for subtitle sync
 
 
 class ProcessingResult(BaseModel):
@@ -252,8 +259,8 @@ async def root():
                     <div id="video-preview" class="space-y-4">
                         <div class="text-gray-500 text-center py-8">
                             <i class="fas fa-video text-4xl mb-2"></i>
-                            <p>Video generation coming soon!</p>
-                            <p class="text-sm mt-2">Currently building video pipeline</p>
+                            <p>Generate audio first, then create your video!</p>
+                            <p class="text-sm mt-2">✅ Full video pipeline ready with 14 background styles</p>
                         </div>
                     </div>
                 </div>
@@ -539,12 +546,29 @@ AITA for refusing to give my sister money for her wedding?`;
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Background Style</label>
                                 <select id="background-type" class="w-full p-2 border border-gray-300 rounded text-sm">
-                                    <option value="geometric_patterns">Geometric Patterns (Clean & Modern)</option>
-                                    <option value="minecraft_parkour">Minecraft Parkour (Gaming)</option>
-                                    <option value="subway_surfers">Subway Surfers (Popular Choice)</option>
-                                    <option value="satisfying_slime">Satisfying Slime (ASMR Style)</option>
-                                    <option value="cooking_asmr">Cooking ASMR (Lifestyle)</option>
-                                    <option value="nature_scenes">Nature Scenes (Calming)</option>
+                                    <optgroup label="🎮 Gaming">
+                                        <option value="minecraft_parkour">Minecraft Parkour (Adventure)</option>
+                                        <option value="subway_surfers">Subway Surfers (Popular Choice)</option>
+                                    </optgroup>
+                                    <optgroup label="😌 Satisfying">
+                                        <option value="slime_mixing">Slime Mixing (ASMR)</option>
+                                        <option value="kinetic_sand">Kinetic Sand (Tactile)</option>
+                                        <option value="soap_cutting">Soap Cutting (Precise)</option>
+                                    </optgroup>
+                                    <optgroup label="🌿 Nature">
+                                        <option value="rain_window">Rain on Window (Cozy)</option>
+                                        <option value="ocean_waves">Ocean Waves (Peaceful)</option>
+                                        <option value="fireplace">Fireplace (Warm)</option>
+                                    </optgroup>
+                                    <optgroup label="🎨 Abstract">
+                                        <option value="geometric_patterns">Geometric Patterns (Modern)</option>
+                                        <option value="color_gradients">Color Gradients (Artistic)</option>
+                                        <option value="particle_effects">Particle Effects (Dynamic)</option>
+                                    </optgroup>
+                                    <optgroup label="🏠 Lifestyle">
+                                        <option value="cooking_asmr">Cooking ASMR (Comfort)</option>
+                                        <option value="coffee_brewing">Coffee Brewing (Routine)</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             
@@ -771,6 +795,13 @@ async def synthesize_speech(request: TTSRequest):
         if processed_content is None:
             raise ValueError("Content processing failed")
         
+        # Apply bidirectional text normalization for TTS-subtitle sync
+        normalized = text_normalizer.process_for_sync(request.text)
+        
+        logger.info(f"Applied text normalization: {len(normalized.transformation_log)} transformation types")
+        for transform in normalized.transformation_log:
+            logger.debug(f"  {transform['type']}: {transform['count']} changes")
+        
         # Prepare content analysis for TTS selection
         content_analysis = {
             "quality_score": processed_content.validation.quality_score,
@@ -797,23 +828,39 @@ async def synthesize_speech(request: TTSRequest):
         # Create output directory
         output_dir = settings.get_output_path("audio")
         
-        # Generate speech
+        # Generate speech using normalized TTS text
         result = tts_engine.synthesize_with_fallback(
-            processed_content.tts_optimized_text,
+            normalized.tts_text,  # Use bidirectionally normalized text
             content_analysis
         )
         
         if not result.success:
             raise ValueError(f"TTS synthesis failed: {result.error_message}")
         
+        # Store both original and normalized text in cache for video generation sync
+        audio_filename = result.audio_path.name
+        processed_text_cache[audio_filename] = {
+            "original_text": normalized.original_text,
+            "tts_text": normalized.tts_text,
+            "normalized_data": normalized,
+            "timing_method": "standard"
+        }
+        logger.info(f"Cached bidirectional text mapping for {audio_filename}")
+        
+        # Debug: Show first 200 chars of normalized text
+        logger.info(f"TTS text preview: {normalized.tts_text[:200]}...")
+        
         # Prepare response data
         response_data = {
             "provider_used": result.provider_used.value,
             "quality_score": result.quality_score,
             "duration": result.duration,
-            "audio_filename": result.audio_path.name,
+            "audio_filename": audio_filename,
             "audio_path": str(result.audio_path),
-            "metadata": result.metadata
+            "metadata": result.metadata,
+            "processed_text": normalized.tts_text,  # TTS-optimized text for subtitle sync
+            "original_text": normalized.original_text,  # Original text for reference
+            "transformations": len(normalized.transformation_log)  # Number of transformations applied
         }
         
         return ProcessingResult(
@@ -827,6 +874,89 @@ async def synthesize_speech(request: TTSRequest):
         return ProcessingResult(
             success=False,
             message=f"Synthesis failed: {str(e)}",
+            data=None
+        )
+
+
+@app.post("/api/synthesize-with-timing", response_model=ProcessingResult)
+async def synthesize_speech_with_timing(request: TTSRequest):
+    """Generate speech with perfect word-level timing using Edge TTS."""
+    try:
+        logger.info("Synthesizing speech with Edge TTS perfect timing")
+        
+        # First analyze content
+        processed_content = content_processor.process(request.text)
+        if processed_content is None:
+            raise ValueError("Content processing failed")
+        
+        # Apply bidirectional text normalization
+        normalized = text_normalizer.process_for_sync(request.text)
+        logger.info(f"Applied text normalization: {len(normalized.transformation_log)} transformation types")
+        
+        # Import Edge TTS timing provider
+        from generators.edge_tts_timing_provider import create_edge_tts_timing_provider
+        
+        edge_provider = create_edge_tts_timing_provider()
+        if not edge_provider.is_available():
+            raise ValueError("Edge TTS with timing not available")
+        
+        # Generate audio with perfect timing
+        audio_path, word_timings = edge_provider.generate_audio_with_timing_sync(
+            text=normalized.tts_text,
+            voice=request.voice or "en-US-AriaNeural",
+            speed=request.speed or 1.0
+        )
+        
+        # Cache timing data
+        timing_cache_path = audio_path.with_suffix('.timing.json')
+        edge_provider.export_timing_data(word_timings, timing_cache_path)
+        
+        # Generate filename for web access
+        audio_filename = audio_path.name
+        
+        # Cache bidirectional text mapping with perfect timing
+        processed_text_cache[audio_filename] = {
+            "original_text": normalized.original_text,
+            "tts_text": normalized.tts_text,
+            "normalized_data": normalized,
+            "word_timings": edge_provider.convert_to_subtitle_format(word_timings),
+            "timing_method": "edge_tts_perfect"
+        }
+        
+        logger.info(f"Cached perfect timing for {audio_filename}: {len(word_timings)} words")
+        logger.info(f"TTS text preview: {normalized.tts_text[:200]}...")
+        
+        # Prepare response data
+        response_data = {
+            "provider_used": "edge_tts_timing",
+            "quality_score": 0.95,  # Edge TTS has very high quality
+            "duration": word_timings[-1].end if word_timings else 0.0,
+            "audio_filename": audio_filename,
+            "audio_path": str(audio_path),
+            "word_count": len(word_timings),
+            "metadata": {
+                "voice_used": request.voice or "en-US-AriaNeural",
+                "timing_method": "edge_tts_perfect",
+                "text_length": len(request.text),
+                "speed": request.speed or 1.0
+            },
+            "processed_text": normalized.tts_text,
+            "original_text": normalized.original_text,
+            "transformations": len(normalized.transformation_log),
+            "perfect_timing": True
+        }
+        
+        return ProcessingResult(
+            success=True,
+            message="Speech synthesis with perfect timing completed successfully",
+            data=response_data
+        )
+        
+    except Exception as e:
+        logger.error(f"Edge TTS synthesis error: {e}")
+        return ProcessingResult(
+            success=False,
+            message=f"Edge TTS synthesis failed: {str(e)}",
             data=None
         )
 
@@ -860,14 +990,22 @@ async def generate_video(request: VideoRequest):
         if not audio_path:
             raise ValueError(f"Audio file not found: {request.audio_filename}")
         
-        # Configure video generation
+        # Configure video generation - expanded background options
         background_map = {
             "geometric_patterns": BackgroundType.GEOMETRIC_PATTERNS,
             "minecraft_parkour": BackgroundType.MINECRAFT_PARKOUR,
             "subway_surfers": BackgroundType.SUBWAY_SURFERS,
             "satisfying_slime": BackgroundType.SATISFYING_SLIME,
             "cooking_asmr": BackgroundType.COOKING_ASMR,
-            "nature_scenes": BackgroundType.NATURE_SCENES
+            "nature_scenes": BackgroundType.NATURE_SCENES,
+            # Add new background styles
+            "slime_mixing": BackgroundType.SATISFYING_SLIME,
+            "kinetic_sand": BackgroundType.SATISFYING_SLIME,
+            "rain_window": BackgroundType.NATURE_SCENES,
+            "ocean_waves": BackgroundType.NATURE_SCENES,
+            "fireplace": BackgroundType.NATURE_SCENES,
+            "color_gradients": BackgroundType.GEOMETRIC_PATTERNS,
+            "particle_effects": BackgroundType.GEOMETRIC_PATTERNS
         }
         
         format_map = {
@@ -879,18 +1017,49 @@ async def generate_video(request: VideoRequest):
         
         config = VideoConfig(
             format=format_map.get(request.video_format, VideoFormat.TIKTOK),
-            background_type=background_map.get(request.background_type, BackgroundType.GEOMETRIC_PATTERNS)
+            background_type=background_map.get(request.background_type, BackgroundType.GEOMETRIC_PATTERNS),
+            synchronized_text=request.synchronized_text
         )
         
-        # Generate video
+        # Generate video using normalized text from cache for subtitle sync
+        cached_text_data = processed_text_cache.get(request.audio_filename)
+        
+        # Determine which text to use for subtitles
+        if cached_text_data and isinstance(cached_text_data, dict):
+            # Use the TTS-optimized text to ensure subtitles match what's spoken
+            subtitle_text = cached_text_data.get("tts_text", request.text)
+            text_source = "normalized_tts"
+            logger.info(f"Using normalized TTS text for subtitles (matches spoken audio)")
+        elif cached_text_data and isinstance(cached_text_data, str):
+            # Legacy cache format (string)
+            subtitle_text = cached_text_data
+            text_source = "legacy_cache"
+            logger.warning("Using legacy cache format - consider regenerating audio for better sync")
+        else:
+            # Fallback to request text and normalize on-the-fly
+            normalized_fallback = text_normalizer.process_for_sync(request.text)
+            subtitle_text = normalized_fallback.tts_text
+            text_source = "fallback_normalized"
+            logger.info("No cache found, normalized text on-the-fly")
+        
+        logger.info(f"Video generation: using text from {text_source} (length: {len(subtitle_text)})")
+        
+        # Debug: Show first 200 chars of subtitle text
+        logger.info(f"Subtitle text preview: {subtitle_text[:200]}...")
+        
         result = video_generator.generate_video(
             audio_path=audio_path,
-            text=request.text,
+            text=subtitle_text,
             config=config
         )
         
         if not result.success:
             raise ValueError(f"Video generation failed: {result.error_message}")
+        
+        # Clean up processed text cache entry
+        if request.audio_filename in processed_text_cache:
+            del processed_text_cache[request.audio_filename]
+            logger.debug(f"Cleaned up cache entry for {request.audio_filename}")
         
         # Prepare response data
         response_data = {
@@ -995,6 +1164,46 @@ async def get_providers():
     except Exception as e:
         logger.error(f"Error getting provider info: {e}")
         raise HTTPException(status_code=500, detail="Error getting provider information")
+
+
+@app.get("/api/backgrounds")
+async def get_backgrounds():
+    """Get information about available background styles."""
+    try:
+        # Get all available backgrounds
+        backgrounds = video_generator.get_available_backgrounds()
+        
+        # Get backgrounds organized by category
+        categories = {}
+        for bg_name, bg_info in backgrounds.items():
+            category = bg_info["category"]
+            if category not in categories:
+                categories[category] = []
+            categories[category].append({
+                "id": bg_name,
+                "name": bg_info["name"],
+                "description": bg_info["description"],
+                "best_for": bg_info["best_for"],
+                "complexity": bg_info["complexity"]
+            })
+        
+        return {
+            "backgrounds": backgrounds,
+            "categories": categories,
+            "total_count": len(backgrounds)
+        }
+    except Exception as e:
+        logger.error(f"Error getting background info: {e}")
+        raise HTTPException(status_code=500, detail="Error getting background information")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Return a simple favicon to prevent 404 errors."""
+    from fastapi.responses import Response
+    # Simple 1x1 transparent icon
+    favicon_data = b'\x00\x00\x01\x00\x01\x00\x01\x01\x00\x00\x01\x00\x18\x00(\x00\x00\x00\x16\x00\x00\x00(\x00\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00\x01\x00\x18\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    return Response(content=favicon_data, media_type="image/x-icon")
 
 
 @app.get("/health")

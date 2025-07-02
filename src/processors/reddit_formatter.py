@@ -51,10 +51,9 @@ class RedditFormatter:
         self.pronunciation_fixes = {
             # Numbers and special characters
             r'&': ' and ',
-            r'\$(\d+)': r'\1 dollars',
+            r'\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)': r'\1 dollars',
             r'(\d+)%': r'\1 percent',
-            r'(\d+)k\b': r'\1 thousand',
-            r'(\d+)M\b': r'\1 million',
+            r'\b(\d+)k\b(?!\)|\w)': r'\1 thousand',
             r'(\d+)/(\d+)': r'\1 out of \2',
             r'(\d{1,2}):(\d{2})': r'\1 \2',  # Time format
             
@@ -100,8 +99,8 @@ class RedditFormatter:
             # Remove Reddit markup
             cleaned = self._remove_markdown(cleaned)
             
-            # Replace Reddit abbreviations
-            cleaned = self._replace_reddit_abbreviations(cleaned)
+            # Replace Reddit abbreviations - DISABLED to preserve original text for subtitle sync
+            # cleaned = self._replace_reddit_abbreviations(cleaned)
             
             # Clean up spacing and formatting
             cleaned = self._normalize_spacing(cleaned)
@@ -138,8 +137,8 @@ class RedditFormatter:
             # Add natural pauses
             optimized = self._add_natural_pauses(optimized)
             
-            # Fix contractions for clarity
-            optimized = self._expand_contractions(optimized)
+            # Fix contractions for clarity - DISABLED to preserve original text for subtitle sync
+            # optimized = self._expand_contractions(optimized)
             
             # Normalize punctuation for better speech rhythm
             optimized = self._normalize_punctuation(optimized)
