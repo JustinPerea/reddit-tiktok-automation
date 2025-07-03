@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2025-07-02
 
 ### Fixed
+- **🎯 Perfect Text Synchronization**: Fixed text overlay synchronization with audio using intelligent Edge TTS timing detection
+  - Previously: Text used artificial fixed timing (350ms per word) from WhisperS2T segments
+  - Now: Automatically detects and uses Edge TTS perfect word-level timing when available
+  - Result: Natural text synchronization (87ms to 474ms per word based on speech complexity)
+  - Maintains backward compatibility with gTTS/WhisperS2T timing as fallback
+  - Technical: Added Edge TTS timing cache detection in both main generation and analysis paths
+
 - **Video Aspect Ratio Preservation**: Fixed critical issue where background videos were being stretched to fit vertical formats instead of properly cropped
   - Previously: Videos were scaled directly to 1080x1920, causing distortion
   - Now: Videos maintain original aspect ratio with center cropping
