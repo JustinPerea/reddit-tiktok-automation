@@ -173,6 +173,25 @@ class VideoGenerator:
                     error_message="Invalid audio file or duration"
                 )
             
+            # Check if we have Edge TTS perfect timing available
+            edge_timings = self._get_edge_tts_timing_for_audio(audio_path, text)
+            if edge_timings:
+                logger.info(f"Perfect Edge TTS timing detected, using perfect sync path")
+                # For perfect timing, we need to modify the method to accept output_path
+                # For now, generate and then copy to desired output_path if specified
+                result = self.generate_video_with_perfect_timing(
+                    audio_path=audio_path,
+                    text=text,
+                    word_timings=edge_timings,
+                    config=config
+                )
+                # Copy to desired output path if specified
+                if result.success and output_path and result.video_path != output_path:
+                    import shutil
+                    shutil.copy2(result.video_path, output_path)
+                    result.video_path = output_path
+                return result
+            
             # Create background video
             background_path = self._create_background_video(audio_duration, config)
             if not background_path:
@@ -598,6 +617,12 @@ class VideoGenerator:
             return None
     def _analyze_audio_for_word_timings(self, audio_path: Path, text: str) -> List[Tuple[str, float, float]]:
         """Analyze actual audio using TTS-aware timing with WhisperS2T segment anchors."""
+        
+        # First try Edge TTS timing if available
+        edge_timings = self._get_edge_tts_timing_for_audio(audio_path, text)
+        if edge_timings:
+            logger.info(f"Using Edge TTS perfect timing for {len(edge_timings)} words")
+            return edge_timings
         
         # Try WhisperS2T for segment-level timing anchors
         try:
